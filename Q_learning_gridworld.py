@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import pickle
+import copy 
 
 start_x = 0
 start_y = 0
@@ -29,9 +30,9 @@ def make_move(state, action):
     elif action == "down":
         new_state = (state[0], state[1] - 1)
     elif action == "left":
-        new_state = (state[0] + 1, state[1])
-    elif action == "right":
         new_state = (state[0] - 1, state[1])
+    elif action == "right":
+        new_state = (state[0] + 1, state[1])
     if is_legal(new_state):
         return new_state
     return state
@@ -78,24 +79,26 @@ class Agent:
     def play(self, rounds, global_count):
         i = 0
         global_count_temp = global_count
+        cumulative_data = []
         while i < rounds:
             action = self.chooseAction()
             next_state = make_move(self.state, action)
             next_action = self.actions[np.argmax([self.Q_values[next_state][a] for a in self.actions])]
             self.Q_values[self.state][action] = self.Q_values[self.state][action] + self.lr * (self.decay_gamma * self.Q_values[next_state][next_action] - self.Q_values[self.state][action])
-            self.states.append([self.state, action, self.Q_values])
+            self.states.append([self.state, action, copy.deepcopy(self.Q_values)])
+            #print(self.states[0])
+            #print("------------------------------")
             self.state = next_state
             if self.state == goal:
-                file_name = "data_agent_" + str(global_count_agent) + ".pkl"
-                cumulative_data = load_data(file_name)
-                cumulative_data += self.states
-                with open(file_name, 'wb') as file:
-                    pickle.dump(cumulative_data, file)
+                cumulative_data.append(self.states)
                 self.states = []
                 self.state = start
                 i += 1
                 print(f"Round {str(i)} complete")
             global_count_temp += 1
+        file_name = "gridworld_agent_data/data_agent_" + str(global_count_agent) + ".pkl"
+        with open(file_name, 'wb') as file:
+            pickle.dump(cumulative_data, file)
         return global_count_temp
 
 # while (global_count < 1000000):
@@ -105,7 +108,8 @@ class Agent:
 #     global_count = new_agent.play(50, global_count)
 #     global_count_agent += 1
 
-test = load_data("data_agent_0.pkl")
-print(test)
+test = load_data("gridworld_agent_data/data_agent_0.pkl")
+print(len(test))
+print(test[0][0])
 
             
