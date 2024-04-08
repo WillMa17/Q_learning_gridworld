@@ -89,7 +89,7 @@ def default_dict():
     return {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
 
 class Agent:
-    def __init__(self, player, board):
+    def __init__(self, player, board, Q_val = None, MCTS_factor = 1):
         self.states = [] 
         self.state = board
         self.lr = 0.2
@@ -97,17 +97,19 @@ class Agent:
         self.decay_gamma = 0.9
         self.player = player
         self.tree = MCTS()
-        self.MCTS_factor = 1
-        self.MCTS_decay = 0.99
+        self.MCTS_factor = MCTS_factor
+        self.MCTS_decay = 0.99998
 
         self.Q_values = defaultdict(default_dict)
+        if Q_val is not None:
+            self.Q_values = Q_val
     
     def chooseAction(self):
         if np.random.uniform(0, 1) <= self.exp_rate:
             action = np.random.choice(get_possible_moves(self.state.board))
             return action
         else:
-            for _ in range(200):
+            for _ in range(100):
                 self.tree.rollout(self.state) #perform MCTS rollout
 
             if self.state not in self.tree.children: #we're at a spot we haven't seen yet -- Q learning and MCTS at this point should do the same thing
@@ -141,6 +143,7 @@ class Agent:
         self.states = []
         self.state = board
         self.MCTS_factor *= self.MCTS_decay
+        self.tree = MCTS()
         if iteration % 1000 == 0:
             file_path = os.path.join("connect_4_q_vals", "data_agent_q_values_" + str(self.player) + "_game_" + str(iteration) + ".pkl")
             with open(file_path, 'wb') as file:
@@ -192,7 +195,7 @@ class Agent:
 board = ConnectFourBoard()
 agent_1 = Agent(1, board)
 agent_2 = Agent(2, board)
-for i in tqdm(range(10000)):
+for i in tqdm(range(50000)):
     move_1 = None
     move_2 = None
     while True:
@@ -237,4 +240,55 @@ for i in tqdm(range(10000)):
 # with open("connect_4_q_vals/data_agent_q_values_1_game_0.pkl", 'rb') as file:
 #     test = pickle.load(file)
 #     print(test)
+
+# with open("connect_4_data/data_agent_1_game_0.pkl", 'rb') as file:
+#     test = pickle.load(file)
+#     print(test)
+
+
+# Q_vals = None
+# with open("connect_4_q_vals/data_agent_q_values_1_game_9000.pkl", 'rb') as file:
+#     Q_vals = pickle.load(file)
+
+# board = ConnectFourBoard()
+# agent_1 = Agent(1, board, Q_vals, 0)
+# agent_2 = Agent(2, board, None, 0)
+# move_1 = None
+# move_2 = None
+# print(Q_vals)
+# while True:
+#     move_1 = agent_1.chooseAction()
+#     board = board.make_move(move_1)
+#     for row in board.board:
+#         print(row)
+#     print("_____________________________")
+#     if board.terminal: #hit a terminal state, update Q values for both agents
+#         reward_1 = board.find_reward(1)
+#         reward_2 = board.find_reward(2)
+#         agent_1.update_values(move_1, reward_1)
+#         agent_2.update_values(move_2, reward_2)
+#         break
+#     elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
+#         board_str = str(board.board)
+#         next_action_2 = np.argmax([agent_2.Q_values[board_str][a] for a in get_possible_moves(board.board)])
+#         reward_2 = agent_2.Q_values[board_str][next_action_2]
+#         agent_2.update_values(move_2, reward_2)
+#         agent_2.state = board
+#     move_2 = agent_2.chooseAction()
+#     board = board.make_move(move_2)
+#     for row in board.board:
+#         print(row)
+#     print("_____________________________")
+#     if board.terminal: #hit a terminal state, update Q values for both agents
+#         reward_1 = board.find_reward(1)
+#         reward_2 = board.find_reward(2)
+#         agent_1.update_values(move_1, reward_1)
+#         agent_2.update_values(move_2, reward_2)
+#         break
+#     else:
+#         board_str = str(board.board)
+#         next_action_1 = np.argmax([agent_1.Q_values[board_str][a] for a in get_possible_moves(board.board)])
+#         reward_1 = agent_1.Q_values[board_str][next_action_1]
+#         agent_1.update_values(move_1, reward_1)
+#         agent_1.state = board
 
