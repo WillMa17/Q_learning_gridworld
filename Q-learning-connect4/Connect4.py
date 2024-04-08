@@ -1,6 +1,6 @@
 class ConnectFourBoard:
     def __init__(self):
-        self.board = [[None for _ in range(7)] for _ in range(6)]  # 7x6 board
+        self.board = [[0 for _ in range(7)] for _ in range(6)]  # 7x6 board
         self.turn = 1  # True for Player 1's turn, False for Player 2's turn
         self.winner = None
         self.terminal = False
@@ -11,7 +11,7 @@ class ConnectFourBoard:
             return set()
         children = set()
         for col in range(7):
-            if self.board[0][col] is None:  # Check if the top cell of the column is empty
+            if self.board[0][col] is 0:  # Check if the top cell of the column is empty
                 children.add(self.make_move(col))
         return children
 
@@ -19,7 +19,7 @@ class ConnectFourBoard:
         from random import choice
         if self.terminal:
             return None
-        empty_columns = [col for col in range(7) if self.board[0][col] is None]
+        empty_columns = [col for col in range(7) if self.board[0][col] is 0]
         col = choice(empty_columns)
         return (self.make_move(col), col)
 
@@ -46,13 +46,12 @@ class ConnectFourBoard:
  
     def make_move(self, col):
         for row in range(5, -1, -1):  # Start from the bottom of the column
-            if self.board[row][col] is None:
-
+            if self.board[row][col] is 0:
                 new_board = [row[:] for row in self.board]
                 new_board[row][col] = self.turn
                 new_turn = (self.turn % 2) + 1
                 new_winner = self.find_winner(new_board, row, col)
-                new_terminal = (new_winner is not None) or all(new_board[0][col] is not None for col in range(7))
+                new_terminal = (new_winner is not None) or all(new_board[0][col] is not 0 for col in range(7))
 
                 new_game = ConnectFourBoard()
                 new_game.board = new_board
@@ -88,6 +87,6 @@ class ConnectFourBoard:
         return None
 
     def to_pretty_string(self):
-        symbols = {1: 'X', 2: 'O', None: '.'}
+        symbols = {1: 'X', 2: 'O', 0: '.'}
         rows = [" ".join(symbols[cell] for cell in row) for row in self.board]
         return "\n" + "\n".join(rows) + "\n"

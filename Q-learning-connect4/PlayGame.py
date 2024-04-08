@@ -13,7 +13,7 @@ def play_game(seed = None):
     
     while not board.terminal:   
         
-        valid_columns = [col for col in range(7) if board.board[0][col] is None]
+        valid_columns = [col for col in range(7) if board.board[0][col] is 0]
         col = random.choice(valid_columns) if valid_columns else None
         
         if col is not None:

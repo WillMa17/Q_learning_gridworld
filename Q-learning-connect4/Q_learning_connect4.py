@@ -2,6 +2,8 @@ import numpy as np
 import random
 import pickle
 import copy 
+import os
+from tqdm import tqdm
 from collections import defaultdict
 from TreeSearch import MCTS
 from Connect4 import ConnectFourBoard
@@ -26,7 +28,7 @@ num_cols = 7
 #     return True 
 
 def get_possible_moves(board):
-    return [index for index, value in enumerate(board.board[0]) if value is None]
+    return [index for index, value in enumerate(board[0]) if value is 0]
 
 # def load_data(filename):
 #     try:
@@ -87,7 +89,6 @@ def get_possible_moves(board):
 
 class Agent:
     def __init__(self, player, board):
-        self.cumulative_data = []
         self.states = [] 
         self.state = board
         self.lr = 0.2
@@ -98,7 +99,7 @@ class Agent:
         self.MCTS_factor = 1
         self.MCTS_decay = 0.99
 
-        self.Q_values = defaultdict(lambda: 0)
+        self.Q_values = defaultdict(lambda: {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0})
     
     def chooseAction(self):
         if np.random.uniform(0, 1) <= self.exp_rate:
@@ -115,12 +116,13 @@ class Agent:
                 mx_nxt_reward = float('-inf')
                 potential_actions = []
                 for child in self.tree.children[self.state]:
-                    if self.N[child] == 0:
+                    if self.tree.N[child] == 0:
                         child_score = float("-inf")
                     else:
                         child_score = self.tree.Q[child] / self.tree.N[child]
                     action = getattr(child, 'last_move')[1]
-                    nxt_reward = (1 - self.MCTS_factor) * self.Q_values[self.state.board][action] + self.MCTS_factor * child_score
+                    board_str = str(self.state.board)
+                    nxt_reward = (1 - self.MCTS_factor) * self.Q_values[board_str][action] + self.MCTS_factor * child_score
                     if nxt_reward > mx_nxt_reward:
                         mx_nxt_reward = nxt_reward
                         potential_actions = [action]
@@ -132,14 +134,22 @@ class Agent:
                     return potential_actions[random.randrange(len(potential_actions))]
         
     def newGame(self, board, iteration):
-        self.cumulative_data.append(self.states)
+        file_path = os.path.join("connect_4_data", "data_agent_" + str(self.player) + "_game_" + str(iteration) + ".pkl")
+        with open(file_path, 'wb') as file:
+            pickle.dump(self.states, file)
         self.states = []
         self.state = board
         self.MCTS_factor *= self.MCTS_decay
+        if iteration % 1000 == 0:
+            file_path = os.path.join("connect_4_q_vals", "data_agent_q_values_" + str(self.player) + "_game_" + str(iteration) + ".pkl")
+            with open(file_path, 'wb') as file:
+                pickle.dump(self.Q_values, file)
+        
 
     def update_values(self, move, reward):
-        self.Q_values[self.state.board][move] = self.Q_values[self.state.board][move] + self.lr * (self.decay_gamma * reward - self.Q_values[self.state.board][move])
-        self.states.append([self.state, move, copy.deepcopy(self.Q_values)])
+        board_str = str(self.state.board)
+        self.Q_values[board_str][move] = self.Q_values[board_str][move] + self.lr * (self.decay_gamma * reward - self.Q_values[board_str][move])
+        self.states.append([(self.state.board, copy.deepcopy(self.Q_values[board_str])), move])
 
 #     def play(self, rounds, global_count):
 #         i = 0
@@ -181,12 +191,15 @@ class Agent:
 board = ConnectFourBoard()
 agent_1 = Agent(1, board)
 agent_2 = Agent(2, board)
-for i in range(10000):
+for i in tqdm(range(10000)):
     move_1 = None
     move_2 = None
     while True:
         move_1 = agent_1.chooseAction()
         board = board.make_move(move_1)
+        # for row in board.board:
+        #     print(row)
+        # print("_____________________________")
         if board.terminal: #hit a terminal state, update Q values for both agents
             reward_1 = board.find_reward(1)
             reward_2 = board.find_reward(2)
@@ -194,12 +207,16 @@ for i in range(10000):
             agent_2.update_values(move_2, reward_2)
             break
         elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
-            next_action_2 = np.argmax([agent_2.Q_values[board.board][a] for a in get_possible_moves(board.board)])
+            board_str = str(board.board)
+            next_action_2 = np.argmax([agent_2.Q_values[board_str][a] for a in get_possible_moves(board.board)])
             reward_2 = agent_2.Q_values[board][next_action_2]
             agent_2.update_values(move_2, reward_2)
             agent_2.state = board
         move_2 = agent_2.chooseAction()
         board = board.make_move(move_2)
+        # for row in board.board:
+        #     print(row)
+        # print("_____________________________")
         if board.terminal: #hit a terminal state, update Q values for both agents
             reward_1 = board.find_reward(1)
             reward_2 = board.find_reward(2)
@@ -207,10 +224,12 @@ for i in range(10000):
             agent_2.update_values(move_2, reward_2)
             break
         else:
-            next_action_1 = np.argmax([agent_1.Q_values[board.board][a] for a in get_possible_moves(board.board)])
+            board_str = str(board.board)
+            next_action_1 = np.argmax([agent_1.Q_values[board_str][a] for a in get_possible_moves(board.board)])
             reward_1 = agent_1.Q_values[board][next_action_1]
             agent_1.update_values(move_1, reward_1)
             agent_1.state = board
     board = ConnectFourBoard()
     agent_1.newGame(board, i)
     agent_2.newGame(board, i)
+
