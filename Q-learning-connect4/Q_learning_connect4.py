@@ -89,22 +89,25 @@ def default_dict():
     return {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0}
 
 class Agent:
-    def __init__(self, player, board, Q_val = None, MCTS_factor = 1):
+    def __init__(self, player, board, Q_val = None, MCTS_factor = 1, MCTS_decay = 0.99998, random = False):
         self.states = [] 
         self.state = board
         self.lr = 0.2
-        self.exp_rate = 0.3
+        self.exp_rate = 0.05
         self.decay_gamma = 0.9
         self.player = player
         self.tree = MCTS()
         self.MCTS_factor = MCTS_factor
-        self.MCTS_decay = 0.99998
+        self.MCTS_decay = MCTS_decay
+        self.random = random
 
         self.Q_values = defaultdict(default_dict)
         if Q_val is not None:
             self.Q_values = Q_val
     
     def chooseAction(self):
+        if self.random:
+            return np.random.choice(get_possible_moves(self.state.board))
         if np.random.uniform(0, 1) <= self.exp_rate:
             action = np.random.choice(get_possible_moves(self.state.board))
             return action
@@ -138,104 +141,71 @@ class Agent:
         
     def newGame(self, board, iteration):
         file_path = os.path.join("connect_4_data", "data_agent_" + str(self.player) + "_game_" + str(iteration) + ".pkl")
-        with open(file_path, 'wb') as file:
-            pickle.dump(self.states, file)
+        if iteration is not None:
+            with open(file_path, 'wb') as file:
+                pickle.dump(self.states, file)
+            if iteration % 10000 == 0:
+                file_path = os.path.join("connect_4_q_vals", "data_agent_q_values_" + str(self.player) + "_game_" + str(iteration) + ".pkl")
+                with open(file_path, 'wb') as file:
+                    pickle.dump(self.Q_values, file)
         self.states = []
         self.state = board
         self.MCTS_factor *= self.MCTS_decay
         self.tree = MCTS()
-        if iteration % 1000 == 0:
-            file_path = os.path.join("connect_4_q_vals", "data_agent_q_values_" + str(self.player) + "_game_" + str(iteration) + ".pkl")
-            with open(file_path, 'wb') as file:
-                pickle.dump(self.Q_values, file)
 
-
-    def update_values(self, move, reward):
+    def update_values(self, move, reward, offset, board):
         board_str = str(self.state.board)
         self.Q_values[board_str][move] = self.Q_values[board_str][move] + self.lr * (self.decay_gamma * reward - self.Q_values[board_str][move])
-        self.states.append([(self.state.board, copy.deepcopy(self.Q_values[board_str])), move])
+        # print("hi")
+        # print(self.player)
+        # print(self.state.move_history)
+        self.states.append([(board.move_history[:offset], copy.deepcopy(self.Q_values[board_str])), board.move_history[offset]])
 
-#     def play(self, rounds, global_count):
-#         i = 0
-#         global_count_temp = global_count
-#         cumulative_data = []
-#         while i < rounds:
-#             action = self.chooseAction()
-#             next_state = make_move(self.state, action)
-#             next_action = self.actions[np.argmax([self.Q_values[next_state][a] for a in self.actions])]
-#             self.Q_values[self.state][action] = self.Q_values[self.state][action] + self.lr * (self.decay_gamma * self.Q_values[next_state][next_action] - self.Q_values[self.state][action])
-#             self.states.append([self.state, action, copy.deepcopy(self.Q_values)])
-#             #print(self.states[0])
-#             #print("------------------------------")
-#             self.state = next_state
-#             if self.state == goal:
-#                 cumulative_data.append(self.states)
-#                 self.states = []
-#                 self.state = start
-#                 i += 1
-#                 global_count_temp += 1
-#                 print(f"Round {str(i)} complete")
-#         file_name = "gridworld_agent_data/data_agent_" + str(global_count_agent) + ".pkl"
-#         with open(file_name, 'wb') as file:
-#             pickle.dump(cumulative_data, file)
-#         return global_count_temp
+# Q_vals_1 = None
+# with open("connect_4_q_vals/data_agent_q_values_1_game_150000.pkl", 'rb') as file:
+#     Q_vals_1 = pickle.load(file)
+# Q_vals_2 = None
+# with open("connect_4_q_vals/data_agent_q_values_2_game_150000.pkl", 'rb') as file:
+#     Q_vals_2 = pickle.load(file)
 
-
-# while (global_count < 500000):
-#     new_agent = Agent()
-#     print(f"Agent {str(global_count_agent)}'s turn")
-#     print(f"Global count: {str(global_count)}")
-#     global_count = new_agent.play(50, global_count)
-#     global_count_agent += 1
-
-# test = load_data("gridworld_agent_data/data_agent_0.pkl")
-# print(len(test))
-# print(test[0][0])
-
-board = ConnectFourBoard()
-agent_1 = Agent(1, board)
-agent_2 = Agent(2, board)
-for i in tqdm(range(50000)):
-    move_1 = None
-    move_2 = None
-    while True:
-        move_1 = agent_1.chooseAction()
-        board = board.make_move(move_1)
-        # for row in board.board:
-        #     print(row)
-        # print("_____________________________")
-        if board.terminal: #hit a terminal state, update Q values for both agents
-            reward_1 = board.find_reward(1)
-            reward_2 = board.find_reward(2)
-            agent_1.update_values(move_1, reward_1)
-            agent_2.update_values(move_2, reward_2)
-            break
-        elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
-            board_str = str(board.board)
-            next_action_2 = np.argmax([agent_2.Q_values[board_str][a] for a in get_possible_moves(board.board)])
-            reward_2 = agent_2.Q_values[board_str][next_action_2]
-            agent_2.update_values(move_2, reward_2)
-            agent_2.state = board
-        move_2 = agent_2.chooseAction()
-        board = board.make_move(move_2)
-        # for row in board.board:
-        #     print(row)
-        # print("_____________________________")
-        if board.terminal: #hit a terminal state, update Q values for both agents
-            reward_1 = board.find_reward(1)
-            reward_2 = board.find_reward(2)
-            agent_1.update_values(move_1, reward_1)
-            agent_2.update_values(move_2, reward_2)
-            break
-        else:
-            board_str = str(board.board)
-            next_action_1 = np.argmax([agent_1.Q_values[board_str][a] for a in get_possible_moves(board.board)])
-            reward_1 = agent_1.Q_values[board_str][next_action_1]
-            agent_1.update_values(move_1, reward_1)
-            agent_1.state = board
-    board = ConnectFourBoard()
-    agent_1.newGame(board, i)
-    agent_2.newGame(board, i)
+# board = ConnectFourBoard()
+# agent_1 = Agent(1, board, Q_vals_1, 0, 0, False)
+# agent_2 = Agent(2, board, Q_vals_2, 0, 0, False)
+# for i in tqdm(range(150001, 200001)):
+#     move_1 = None
+#     move_2 = None
+#     while True:
+#         move_1 = agent_1.chooseAction()
+#         board = board.make_move(move_1)
+#         if board.terminal: #hit a terminal state, update Q values for both agents
+#             reward_1 = board.find_reward(1)
+#             reward_2 = board.find_reward(2)
+#             agent_1.update_values(move_1, reward_1, -1, board)
+#             agent_2.update_values(move_2, reward_2, -2, board)
+#             break
+#         elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
+#             board_str = str(board.board)
+#             next_action_2 = np.argmax([agent_2.Q_values[board_str][a] for a in get_possible_moves(board.board)])
+#             reward_2 = agent_2.Q_values[board_str][next_action_2]
+#             agent_2.update_values(move_2, reward_2, -2, board)
+#             agent_2.state = board
+#         move_2 = agent_2.chooseAction()
+#         board = board.make_move(move_2)
+#         if board.terminal: #hit a terminal state, update Q values for both agents
+#             reward_1 = board.find_reward(1)
+#             reward_2 = board.find_reward(2)
+#             agent_1.update_values(move_1, reward_1, -2, board)
+#             agent_2.update_values(move_2, reward_2, -1, board)
+#             break
+#         else:
+#             board_str = str(board.board)
+#             next_action_1 = np.argmax([agent_1.Q_values[board_str][a] for a in get_possible_moves(board.board)])
+#             reward_1 = agent_1.Q_values[board_str][next_action_1]
+#             agent_1.update_values(move_1, reward_1, -2, board)
+#             agent_1.state = board
+#     board = ConnectFourBoard()
+#     agent_1.newGame(board, i)
+#     agent_2.newGame(board, i)
 
 # with open("connect_4_q_vals/data_agent_q_values_1_game_0.pkl", 'rb') as file:
 #     test = pickle.load(file)
@@ -246,49 +216,71 @@ for i in tqdm(range(50000)):
 #     print(test)
 
 
-# Q_vals = None
-# with open("connect_4_q_vals/data_agent_q_values_1_game_9000.pkl", 'rb') as file:
-#     Q_vals = pickle.load(file)
 
-# board = ConnectFourBoard()
-# agent_1 = Agent(1, board, Q_vals, 0)
-# agent_2 = Agent(2, board, None, 0)
-# move_1 = None
-# move_2 = None
-# print(Q_vals)
-# while True:
-#     move_1 = agent_1.chooseAction()
-#     board = board.make_move(move_1)
-#     for row in board.board:
-#         print(row)
-#     print("_____________________________")
-#     if board.terminal: #hit a terminal state, update Q values for both agents
-#         reward_1 = board.find_reward(1)
-#         reward_2 = board.find_reward(2)
-#         agent_1.update_values(move_1, reward_1)
-#         agent_2.update_values(move_2, reward_2)
-#         break
-#     elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
-#         board_str = str(board.board)
-#         next_action_2 = np.argmax([agent_2.Q_values[board_str][a] for a in get_possible_moves(board.board)])
-#         reward_2 = agent_2.Q_values[board_str][next_action_2]
-#         agent_2.update_values(move_2, reward_2)
-#         agent_2.state = board
-#     move_2 = agent_2.chooseAction()
-#     board = board.make_move(move_2)
-#     for row in board.board:
-#         print(row)
-#     print("_____________________________")
-#     if board.terminal: #hit a terminal state, update Q values for both agents
-#         reward_1 = board.find_reward(1)
-#         reward_2 = board.find_reward(2)
-#         agent_1.update_values(move_1, reward_1)
-#         agent_2.update_values(move_2, reward_2)
-#         break
-#     else:
-#         board_str = str(board.board)
-#         next_action_1 = np.argmax([agent_1.Q_values[board_str][a] for a in get_possible_moves(board.board)])
-#         reward_1 = agent_1.Q_values[board_str][next_action_1]
-#         agent_1.update_values(move_1, reward_1)
-#         agent_1.state = board
+'''testing''' 
 
+Q_vals = None
+with open("connect_4_q_vals/data_agent_q_values_1_game_200000.pkl", 'rb') as file:
+    Q_vals = pickle.load(file)
+
+board = ConnectFourBoard()
+agent_1 = Agent(1, board, Q_vals, 0)
+agent_2 = Agent(2, board, None, 1, 1, True)
+move_1 = None
+move_2 = None
+winners = []
+#print(Q_vals)
+for i in tqdm(range(1000)):
+    while True:
+        move_1 = agent_1.chooseAction()
+        board = board.make_move(move_1)
+        # for row in board.board:
+        #     print(row)
+        # print("_____________________________")
+        # print(str(board.board))
+        if board.terminal: #hit a terminal state, update Q values for both agents
+            reward_1 = board.find_reward(1)
+            reward_2 = board.find_reward(2)
+            # agent_1.update_values(move_1, reward_1)
+            # agent_2.update_values(move_2, reward_2)
+            winners.append(board.winner)
+            break
+        elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
+            board_str = str(board.board)
+            next_action_2 = np.argmax([agent_2.Q_values[board_str][a] for a in get_possible_moves(board.board)])
+            reward_2 = agent_2.Q_values[board_str][next_action_2]
+            # agent_2.update_values(move_2, reward_2)
+            agent_2.state = board
+        move_2 = agent_2.chooseAction()
+        board = board.make_move(move_2)
+        # for row in board.board:
+        #     print(row)
+        # print("_____________________________")
+        if board.terminal: #hit a terminal state, update Q values for both agents
+            reward_1 = board.find_reward(1)
+            reward_2 = board.find_reward(2)
+            # agent_1.update_values(move_1, reward_1)
+            # agent_2.update_values(move_2, reward_2)
+            winners.append(board.winner)
+            break
+        else:
+            board_str = str(board.board)
+            next_action_1 = np.argmax([agent_1.Q_values[board_str][a] for a in get_possible_moves(board.board)])
+            reward_1 = agent_1.Q_values[board_str][next_action_1]
+            # agent_1.update_values(move_1, reward_1)
+            agent_1.state = board
+    board = ConnectFourBoard()
+    agent_1.newGame(board, None)
+    agent_2.newGame(board, None)
+
+print(winners.count(1))
+print(winners.count(2))
+print(winners.count(None))
+
+# with open("connect_4_data/data_agent_1_game_50000.pkl", 'rb') as file:
+#     test = pickle.load(file)
+#     print(test)
+
+# with open("connect_4_data/data_agent_2_game_50000.pkl", 'rb') as file:
+#     test = pickle.load(file)
+#     print(test)

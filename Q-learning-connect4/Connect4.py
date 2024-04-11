@@ -5,13 +5,14 @@ class ConnectFourBoard:
         self.winner = None
         self.terminal = False
         self.last_move = None
+        self.move_history = []
 
     def find_children(self):
         if self.terminal:
             return set()
         children = set()
         for col in range(7):
-            if self.board[0][col] is 0:  # Check if the top cell of the column is empty
+            if self.board[0][col] == 0:  # Check if the top cell of the column is empty
                 children.add(self.make_move(col))
         return children
 
@@ -19,7 +20,7 @@ class ConnectFourBoard:
         from random import choice
         if self.terminal:
             return None
-        empty_columns = [col for col in range(7) if self.board[0][col] is 0]
+        empty_columns = [col for col in range(7) if self.board[0][col] == 0]
         col = choice(empty_columns)
         return (self.make_move(col), col)
 
@@ -46,21 +47,27 @@ class ConnectFourBoard:
  
     def make_move(self, col):
         for row in range(5, -1, -1):  # Start from the bottom of the column
-            if self.board[row][col] is 0:
+            if self.board[row][col] == 0:
                 new_board = [row[:] for row in self.board]
                 new_board[row][col] = self.turn
                 new_turn = (self.turn % 2) + 1
                 new_winner = self.find_winner(new_board, row, col)
-                new_terminal = (new_winner is not None) or all(new_board[0][col] is not 0 for col in range(7))
+                new_terminal = (new_winner is not None) or all(new_board[0][col] != 0 for col in range(7))
+                new_move_history = self.move_history + [(row, col)]
 
                 new_game = ConnectFourBoard()
                 new_game.board = new_board
                 new_game.turn = new_turn
                 new_game.winner = new_winner
                 new_game.terminal = new_terminal
+                #print(new_terminal)
                 new_game.last_move = (row, col)
-
+                new_game.move_history = new_move_history
+                #print(new_game.move_history)
                 return new_game
+        for row in self.board:
+            print(row)
+        print(col)
         raise ValueError("Column is full")
 
     def find_winner(self, board, last_row, last_col):
