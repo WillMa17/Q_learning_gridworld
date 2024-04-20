@@ -8,7 +8,7 @@ def visualize_gridworld(state, actions, title="Gridworld", goal = (4, 4), dim = 
     nrows = ncols = dim
     grid = np.zeros((nrows, ncols))
     #actions = up, down, left, right, but for np arrays it's actually right, left, up, down
-    normalized_actions = [(action - min(actions)) / (max(actions) - min(actions)) for action in actions]
+    normalized_actions = [((action - min(actions)) / (max(actions) - min(actions))) + 0.35 for action in actions]
     up_down_left_right = ((state[0], state[1] + 1), (state[0], state[1] - 1), (state[0] - 1, state[1]), (state[0] + 1, state[1]))
     for i in range(4): 
         if (islegal(up_down_left_right[i], nrows, ncols)):
