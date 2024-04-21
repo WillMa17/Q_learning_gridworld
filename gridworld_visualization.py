@@ -4,7 +4,7 @@ import numpy as np
 def islegal(state, nrows, ncols):
     return state[0] >= 0 and state[1] >= 0 and state[0] < nrows and state[1] < ncols
 
-def visualize_gridworld(state, actions, title="Gridworld", goal = (4, 4), dim = 9):
+def visualize_gridworld(state, actions, path = [], title="Gridworld", goal = (4, 4), dim = 9):
     nrows = ncols = dim
     grid = np.zeros((nrows, ncols))
     #actions = up, down, left, right, but for np arrays it's actually right, left, up, down
@@ -20,6 +20,7 @@ def visualize_gridworld(state, actions, title="Gridworld", goal = (4, 4), dim = 
     fig.colorbar(cax, location='left')
     ax.plot(state[0], state[1], 'ro', label = 'Position')  
     ax.plot(goal[0], goal[1], 'bo', label = 'Goal')
+    ax.plot(*zip(*[(p[1], p[0]) for p in path]), 'k-', linewidth=2)  # Path
     ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
     ax.set_xticks(np.arange(-0.5, ncols, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, nrows, 1), minor=True)
@@ -34,4 +35,5 @@ def visualize_gridworld(state, actions, title="Gridworld", goal = (4, 4), dim = 
 if __name__ == '__main__':
     state = (2, 2)
     actions = [3, 2, 1, -1]
-    visualize_gridworld(state, actions)
+    path = [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2)]
+    visualize_gridworld(state, actions, path = path)
