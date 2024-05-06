@@ -1,0 +1,93 @@
+# import dqn
+import os
+from tqdm import tqdm
+import argparse
+import warnings
+warnings.filterwarnings("ignore")
+from env import Connect4Game
+from dqn import DQNAgent
+import torch
+import numpy as np
+import random 
+
+def load_or_initialize_model(model_path, env, params):
+    model = DQNAgent(env, params)
+    if os.path.exists(model_path):
+        model.load_state_dict(torch.load(model_path))
+    return model
+
+def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', action='store_true', help='Train Mode')
+    args = parser.parse_args()
+
+    params_1 = {
+        "N": 1000,
+        "M": 10000,
+        "gamma": 0.9,
+        "epsilon": 0.1,
+        "minibatch_size": 32,
+        "learning_rate": 1e-5,
+        "best_model": None,
+        "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        "player": 1
+    }
+
+    params_2 = {
+        "N": 1000,
+        "M": 10000,
+        "gamma": 0.9,
+        "epsilon": 0.1,
+        "minibatch_size": 32,
+        "learning_rate": 1e-5,
+        "best_model": None,
+        "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        "player": 2
+    }
+
+    env = Connect4Game()
+    agent_1 = load_or_initialize_model("agent_1.pth", env, params_1)
+    agent_2 = load_or_initialize_model("agent_2.pth", env, params_2)
+   
+    if (args.t):
+        torch.manual_seed(1)
+        np.random.seed(1)
+        random.seed(1)
+        torch.cuda.manual_seed(1)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+        for i in tqdm(range(0, 50000)):
+            move_1 = None
+            move_2 = None
+            while True:
+                move_1 = agent_1.get_action()
+                reward_1, done = env.step(move_1, 1)
+                reward_2 = env.find_reward(2)
+                if done: #hit a terminal state, update Q values for both agents
+                    agent_1.update_values(env.state_history[-2], env.state_history[-1], move_1, reward_1, done)
+                    agent_2.update_values(env.state_history[-3], env.state_history[-1], move_2, reward_2, done)
+                    break
+                elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
+                    agent_2.update_values(env.state_history[-3], env.state_history[-1], move_2, reward_2, done)
+                agent_2.update_env(env)
+                move_2 = agent_2.get_action()
+                reward_2, done = env.step(move_2, 2)
+                reward_1 = env.find_reward(1)
+                if done: #hit a terminal state, update Q values for both agents
+                    agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done)
+                    agent_2.update_values(env.state_history[-2], env.state_history[-1], move_2, reward_2, done)
+                    break
+                else:
+                    agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done)
+                agent_1.update_env(env)
+            env.reset()
+            agent_1.reset(env, i)
+            agent_2.reset(env, i)
+        
+        torch.save(agent_1.state_dict(), 'agent_1.pth')
+        torch.save(agent_2.state_dict(), 'agent_2.pth')
+
+if __name__ == "__main__":
+    main()

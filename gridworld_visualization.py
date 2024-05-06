@@ -28,14 +28,14 @@ def visualize_gridworld(state, actions, path = [], title="Gridworld", goal = (4,
     cax = ax.matshow(grid, cmap=cmap)
     ax.xaxis.tick_bottom()
     ax.invert_yaxis()
-    fig.colorbar(cax, location='left')
+    #fig.colorbar(cax, location='left')
     ax.plot(state[0], state[1], 'ro', label = 'Position')  
     ax.plot(goal[0], goal[1], 'bo', label = 'Goal')
     ax.plot(*zip(*[(p[0], p[1]) for p in path]), 'k-', linewidth=2)  # Path
     for (m, n), (m_next, n_next) in zip(path, path[1:]):
         ax.annotate("", xy=(m_next, n_next), xytext=(m, n),
                     arrowprops=dict(arrowstyle="->, head_length=0.6, head_width=0.3", lw=1.5, color='black'))
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    #ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
     ax.set_xticks(np.arange(-0.5, ncols, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, nrows, 1), minor=True)
     ax.grid(which='minor', color='black', linestyle='-', linewidth=1)
