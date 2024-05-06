@@ -30,6 +30,14 @@ def get_valid_locations(board):
                 break
     return locations
 
+def get_random_move(board):
+    locations = []
+    for col in range(7):
+        for row in range(5, -1, -1):
+            if board[row][col] == 0:
+                locations.append(col)
+                break
+    return random.choice(locations)
 
 class DQNAgent():
     def __init__(
@@ -104,11 +112,12 @@ class DQNAgent():
     def update_env(self, env):
         self.env = env
     
-    def reset(self, env, i):
+    def reset(self, env, i, to_log):
         self.env = env
-        file_path = os.path.join("connect_4_data", "data_agent_" + str(self.player) + "_game_" + str(i) + ".pkl")
-        with open(file_path, 'wb') as file:
-            pickle.dump(self.history, file)
+        if to_log:
+            file_path = os.path.join("connect_4_data", "data_agent_" + str(self.player) + "_game_" + str(i) + ".pkl")
+            with open(file_path, 'wb') as file:
+                pickle.dump(self.history, file)
         self.history = []
 
 class DQN(nn.Module):

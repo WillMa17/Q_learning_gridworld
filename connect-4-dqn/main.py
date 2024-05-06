@@ -5,7 +5,7 @@ import argparse
 import warnings
 warnings.filterwarnings("ignore")
 from env import Connect4Game
-from dqn import DQNAgent
+from dqn import DQNAgent, get_random_move
 import torch
 import numpy as np
 import random 
@@ -83,11 +83,35 @@ def main():
                     agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done)
                 agent_1.update_env(env)
             env.reset()
-            agent_1.reset(env, i)
-            agent_2.reset(env, i)
+            agent_1.reset(env, i, True)
+            agent_2.reset(env, i, True)
+            if i % 500 == 0: 
+                torch.save(agent_1.state_dict(), 'agent_1.pth')
+                torch.save(agent_2.state_dict(), 'agent_2.pth') 
         
         torch.save(agent_1.state_dict(), 'agent_1.pth')
-        torch.save(agent_2.state_dict(), 'agent_2.pth')
+        torch.save(agent_2.state_dict(), 'agent_2.pth') 
+        
+    else: 
+        results = []
+        for i in tqdm(range(0, 1000)):
+            while True:
+                move_1 = agent_1.get_action()
+                reward_1, done = env.step(move_1, 1)
+                if done: #hit a terminal state
+                    results.append(env.state.find_winner(env.state.board, env.state.last_move[0], env.state.last_move[1]))
+                    break
+                move_2 = get_random_move(env.state.board)
+                reward_2, done = env.step(move_2, 2)
+                if done: #hit a terminal state
+                    results.append(env.state.find_winner(env.state.board, env.state.last_move[0], env.state.last_move[1]))
+                    break
+                agent_1.update_env(env)
+            env.reset()
+            agent_1.reset(env, i, False)
+        print(results.count(1))
+        print(results.count(2))
+        print(results.count(None))
 
 if __name__ == "__main__":
     main()
