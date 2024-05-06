@@ -13,13 +13,14 @@ import random
 def load_or_initialize_model(model_path, env, params):
     model = DQNAgent(env, params)
     if os.path.exists(model_path):
-        model.load_state_dict(torch.load(model_path))
+        model.dqn.load_state_dict(torch.load(model_path))
     return model
 
 def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', action='store_true', help='Train Mode')
+    parser.add_argument('-s', action='store_true', help='Store Data')
     args = parser.parse_args()
 
     params_1 = {
@@ -62,7 +63,7 @@ def main():
             move_1 = None
             move_2 = None
             while True:
-                move_1 = agent_1.get_action()
+                move_1 = agent_1.get_action(True)
                 reward_1, done = env.step(move_1, 1)
                 reward_2 = env.find_reward(2)
                 if done: #hit a terminal state, update Q values for both agents
@@ -72,7 +73,7 @@ def main():
                 elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
                     agent_2.update_values(env.state_history[-3], env.state_history[-1], move_2, reward_2, done)
                 agent_2.update_env(env)
-                move_2 = agent_2.get_action()
+                move_2 = agent_2.get_action(True)
                 reward_2, done = env.step(move_2, 2)
                 reward_1 = env.find_reward(1)
                 if done: #hit a terminal state, update Q values for both agents
@@ -83,20 +84,20 @@ def main():
                     agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done)
                 agent_1.update_env(env)
             env.reset()
-            agent_1.reset(env, i, True)
-            agent_2.reset(env, i, True)
+            agent_1.reset(env, i, args.s)
+            agent_2.reset(env, i, args.s)
             if i % 500 == 0: 
-                torch.save(agent_1.state_dict(), 'agent_1.pth')
-                torch.save(agent_2.state_dict(), 'agent_2.pth') 
+                torch.save(agent_1.dqn.state_dict(), 'agent_1.pth')
+                torch.save(agent_2.dqn.state_dict(), 'agent_2.pth') 
         
-        torch.save(agent_1.state_dict(), 'agent_1.pth')
-        torch.save(agent_2.state_dict(), 'agent_2.pth') 
+        torch.save(agent_1.dqn.state_dict(), 'agent_1.pth')
+        torch.save(agent_2.dqn.state_dict(), 'agent_2.pth') 
         
     else: 
         results = []
         for i in tqdm(range(0, 1000)):
             while True:
-                move_1 = agent_1.get_action()
+                move_1 = agent_1.get_action(False)
                 reward_1, done = env.step(move_1, 1)
                 if done: #hit a terminal state
                     results.append(env.state.find_winner(env.state.board, env.state.last_move[0], env.state.last_move[1]))

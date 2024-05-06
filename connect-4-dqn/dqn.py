@@ -69,9 +69,9 @@ class DQNAgent():
         self.criterion = MSELoss().to(self.device)
         self.history = []
 
-    def get_action(self) -> int:
+    def get_action(self, random_enabled) -> int:
         # TODO:
-        if random.random() < self.epsilon:
+        if random_enabled and random.random() < self.epsilon:
             action = self.env.action_space_sample()
         else:
             possible_actions = [xy[1] for xy in get_valid_locations(self.env.state.board)]
