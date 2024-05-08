@@ -59,7 +59,7 @@ def main():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-        for i in tqdm(range(0, 50000)):
+        for i in tqdm(range(50000, 2000000)):
             move_1 = None
             move_2 = None
             while True:
