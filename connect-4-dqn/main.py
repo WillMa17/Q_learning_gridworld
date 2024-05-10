@@ -31,7 +31,6 @@ def main():
         "minibatch_size": 32,
         "learning_rate": 1e-5,
         "best_model": None,
-        "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         "player": 1
     }
 
@@ -43,8 +42,7 @@ def main():
         "minibatch_size": 32,
         "learning_rate": 1e-5,
         "best_model": None,
-        "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        "player": 2
+        "player": -1
     }
 
     env = Connect4Game()
@@ -58,38 +56,44 @@ def main():
         torch.cuda.manual_seed(1)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+        agent_1.prepare()
+        agent_2.prepare()
 
-        for i in tqdm(range(50000, 2000000)):
+        for i in tqdm(range(0, 500000)):
             move_1 = None
             move_2 = None
+            output_1 = None
+            output_2 = None
             while True:
-                move_1 = agent_1.get_action(True)
+                output_1, move_1 = agent_1.get_action(True)
                 reward_1, done = env.step(move_1, 1)
                 reward_2 = env.find_reward(2)
                 if done: #hit a terminal state, update Q values for both agents
-                    agent_1.update_values(env.state_history[-2], env.state_history[-1], move_1, reward_1, done)
-                    agent_2.update_values(env.state_history[-3], env.state_history[-1], move_2, reward_2, done)
+                    agent_1.update_values(env.state_history[-2], env.state_history[-1], move_1, reward_1, done, output_1, args.s)
+                    agent_2.update_values(env.state_history[-3], env.state_history[-1], move_2, reward_2, done, output_2, args.s)
                     break
                 elif move_2 is not None: #we calculate states temporal difference as after both agents make a move, so we update for agent_2 since agent_2 just regained control
-                    agent_2.update_values(env.state_history[-3], env.state_history[-1], move_2, reward_2, done)
+                    agent_2.update_values(env.state_history[-3], env.state_history[-1], move_2, reward_2, done, output_2, args.s)
                 agent_2.update_env(env)
-                move_2 = agent_2.get_action(True)
+                output_2, move_2 = agent_2.get_action(True)
                 reward_2, done = env.step(move_2, 2)
                 reward_1 = env.find_reward(1)
                 if done: #hit a terminal state, update Q values for both agents
-                    agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done)
-                    agent_2.update_values(env.state_history[-2], env.state_history[-1], move_2, reward_2, done)
+                    agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done, output_1, args.s)
+                    agent_2.update_values(env.state_history[-2], env.state_history[-1], move_2, reward_2, done, output_2, args.s)
                     break
                 else:
-                    agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done)
+                    agent_1.update_values(env.state_history[-3], env.state_history[-1], move_1, reward_1, done, output_1, args.s)
                 agent_1.update_env(env)
             env.reset()
-            agent_1.reset(env, i, args.s)
-            agent_2.reset(env, i, args.s)
+            agent_1.reset(env)
+            agent_2.reset(env)
             if i % 500 == 0: 
                 torch.save(agent_1.dqn.state_dict(), 'agent_1.pth')
-                torch.save(agent_2.dqn.state_dict(), 'agent_2.pth') 
-        
+                torch.save(agent_2.dqn.state_dict(), 'agent_2.pth')
+            if i % 5000 == 0: 
+                agent_1.record(i)
+                agent_2.record(i)
         torch.save(agent_1.dqn.state_dict(), 'agent_1.pth')
         torch.save(agent_2.dqn.state_dict(), 'agent_2.pth') 
         
@@ -97,7 +101,7 @@ def main():
         results = []
         for i in tqdm(range(0, 1000)):
             while True:
-                move_1 = agent_1.get_action(False)
+                _, move_1 = agent_1.get_action(False)
                 reward_1, done = env.step(move_1, 1)
                 if done: #hit a terminal state
                     results.append(env.state.find_winner(env.state.board, env.state.last_move[0], env.state.last_move[1]))

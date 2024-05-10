@@ -50,7 +50,7 @@ class ConnectFourBoard:
             if self.board[row][col] == 0:
                 new_board = [row[:] for row in self.board]
                 new_board[row][col] = self.turn
-                new_turn = (self.turn % 2) + 1
+                new_turn = -1 * self.turn
                 new_winner = self.find_winner(new_board, row, col)
                 new_terminal = (new_winner is not None) or all(new_board[0][col] != 0 for col in range(7))
                 new_move_history = self.move_history + [(row, col)]
@@ -93,7 +93,7 @@ class ConnectFourBoard:
 
         return None
 
-    def to_pretty_string(self):
-        symbols = {1: 'X', 2: 'O', 0: '.'}
-        rows = [" ".join(symbols[cell] for cell in row) for row in self.board]
-        return "\n" + "\n".join(rows) + "\n"
+    # def to_pretty_string(self):
+    #     symbols = {1: 'X', 2: 'O', 0: '.'}
+    #     rows = [" ".join(symbols[cell] for cell in row) for row in self.board]
+    #     return "\n" + "\n".join(rows) + "\n"

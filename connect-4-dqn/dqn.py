@@ -11,6 +11,7 @@ import torch
 import random
 import pickle
 from env import Connect4Game
+from accelerate import Accelerator
 
 def get_possible_locations(board):
     locations = []
@@ -48,44 +49,44 @@ class DQNAgent():
         self.N = params["N"]
         self.M = params["M"]
         self.gamma = params["gamma"]
-        self.device = params["device"]
         self.epsilon = params["epsilon"]
         self.best_model = params["best_model"]
         self.learning_rate = params["learning_rate"]
         self.minibatch_size = params["minibatch_size"]
         self.player = params["player"]
 
+        self.accelerator = Accelerator()
         self.env = env
-        self.dqn = DQN().to(self.device)
+        self.dqn = DQN()
         self.replay_buffer = ReplayMemory(
             capacity=self.N,
-            device=self.device,
+            device=self.accelerator.device,
         )
         self.optimizer = optim.AdamW(
             self.dqn.parameters(),
             lr=self.learning_rate,
             betas=(0.9, 0.95),
         )
-        self.criterion = MSELoss().to(self.device)
+        self.criterion = MSELoss().to(self.accelerator.device)
         self.history = []
+        self.total_history = []
+        self.accelerator = Accelerator()
 
-    def get_action(self, random_enabled) -> int:
-        # TODO:
+    def prepare(self):
+        self.dqn, self.optimizer = self.accelerator.prepare(self.dqn, self.optimizer)
+
+    def get_action(self, random_enabled):
+        output = self.dqn(torch.tensor(self.env.state.board))
         if random_enabled and random.random() < self.epsilon:
             action = self.env.action_space_sample()
         else:
             possible_actions = [xy[1] for xy in get_valid_locations(self.env.state.board)]
-            output = self.dqn(torch.tensor(self.env.state.board))
-            # print(output.shape)
-            # print(possible_actions)
             mask = torch.full(output.shape, float('-inf')).to('cuda')
             mask[0][possible_actions] = output[0][possible_actions]
             action = torch.argmax(mask).item()
-            # print(action)
-            # print(self.env.state.board)
-        return action
+        return output, action
 
-    def update_values(self, curr_state, next_state, action, reward, done):
+    def update_values(self, curr_state, next_state, action, reward, done, output_old, to_log):
         self.replay_buffer.push(torch.tensor(curr_state), action, reward, torch.tensor(next_state), done)
         minibatch = self.replay_buffer.sample(self.minibatch_size)
         outputs, labels = [], []
@@ -95,36 +96,41 @@ class DQNAgent():
             output = self.dqn(sample["current_state"])[0][sample["action"]]
             outputs.append(output)
             labels.append(target)
-        outputs = torch.stack(outputs).to(self.device)
-        labels = torch.tensor(labels).to(self.device)
+        outputs = torch.stack(outputs).to(self.accelerator.device)
+        labels = torch.tensor(labels).to(self.accelerator.device)
         loss = self.criterion(outputs, labels)
         self.optimizer.zero_grad()
-        loss.backward()
+        self.accelerator.backward(loss)
         self.optimizer.step()
 
-        stored_q_vals = {}
-        q_values = self.dqn(torch.tensor(curr_state))[0]
-        corresponding_locations = get_possible_locations(curr_state)
-        for i in range(7):
-            stored_q_vals[corresponding_locations[i]] = q_values[i]
-        self.history.append((get_valid_locations(curr_state), stored_q_vals, corresponding_locations[action]))
+        if to_log:
+            stored_q_vals = {}
+            q_values = output_old[0]
+            corresponding_locations = get_possible_locations(curr_state)
+            for i in range(7):
+                stored_q_vals[i] = q_values[i].item()
+            self.history.append((get_valid_locations(curr_state), stored_q_vals, corresponding_locations[action]))
 
     def update_env(self, env):
         self.env = env
     
-    def reset(self, env, i, to_log):
+    def reset(self, env):
         self.env = env
-        if to_log:
-            file_path = os.path.join("connect_4_data", "data_agent_" + str(self.player) + "_game_" + str(i) + ".pkl")
-            with open(file_path, 'wb') as file:
-                pickle.dump(self.history, file)
+        if len(self.history) > 0:
+            self.total_history.append(self.history)
         self.history = []
 
+    def record(self, i):
+        if len(self.total_history) != 0:
+            file_path = os.path.join("connect_4_data", "data_agent_" + str(self.player) + "_games_" + str(i) + ".pkl")
+            with open(file_path, 'wb') as file:
+                pickle.dump(self.total_history, file)
+            self.total_history = []
+
 class DQN(nn.Module):
-    
     def __init__(self):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 128, kernel_size=(2, 2), stride=1, padding=0) 
+        self.conv1 = nn.Conv2d(1, 128, kernel_size=(2, 2), stride=1, padding=0)
         self.fc1 = nn.Linear(128 * 5 * 6, 64)  # Adjusted for the output size of the convolution
         self.fc2 = nn.Linear(64, 64)
         self.output = nn.Linear(64, 7)  # Assuming 7 possible actions (one for each column)
@@ -143,7 +149,7 @@ class DQN(nn.Module):
 
 class ReplayMemory():
 
-    def __init__(self, capacity: int, device: str = "cpu"):
+    def __init__(self, capacity: int, device: str):
         self.capacity = capacity
         self.memory = []
         self.position = 0
